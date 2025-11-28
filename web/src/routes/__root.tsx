@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
+  createRootRouteWithContext,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
@@ -16,16 +17,17 @@ import { seo } from "../utils/seo";
 import { getSupabaseServerClient } from "../utils/supabase";
 import {
   NavigationMenu,
-  NavigationMenuContent,
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "~/components/ui/navigation-menu";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFootball } from "@fortawesome/free-solid-svg-icons";
+import { faUser as faUserRegular } from "@fortawesome/free-regular-svg-icons";
 import { Button } from "~/components/ui/button";
+import { QueryClient } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 const fetchUser = createServerFn({ method: "GET" }).handler(async () => {
   const supabase = getSupabaseServerClient();
@@ -37,84 +39,87 @@ const fetchUser = createServerFn({ method: "GET" }).handler(async () => {
 
   return {
     email: data.user.email,
+    id: data.user.id,
   };
 });
 
-export const Route = createRootRoute({
-  beforeLoad: async () => {
-    const user = await fetchUser();
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
+  {
+    beforeLoad: async () => {
+      const user = await fetchUser();
 
-    return {
-      user,
-    };
-  },
-  head: () => ({
-    scripts: [
-      {
-        src: "https://kit.fontawesome.com/73c1af5054.js",
-        crossorigin: "anonymous",
-        async: true,
-      },
-    ],
-    meta: [
-      {
-        charSet: "utf-8",
-      },
-      {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1",
-      },
-      ...seo({
-        title: "Football Weekly Picks",
-        description: `A simple app to help you keep track of your weekly football picks.`,
-      }),
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      {
-        rel: "apple-touch-icon",
-        sizes: "180x180",
-        href: "/apple-touch-icon.png",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "32x32",
-        href: "https://fav.farm/🏈",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "16x16",
-        href: "https://fav.farm/🏈",
-      },
-      { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
-      { rel: "icon", href: "https://fav.farm/🏈" },
-      {
-        rel: "preconnect",
-        href: "https://fonts.googleapis.com",
-      },
-      {
-        rel: "preconnect",
-        href: "https://fonts.gstatic.com",
-        crossOrigin: "true",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Narnoor:wght@400;500;600;700;800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap",
-      },
-    ],
-  }),
-  errorComponent: (props) => {
-    return (
-      <RootDocument>
-        <DefaultCatchBoundary {...props} />
-      </RootDocument>
-    );
-  },
-  notFoundComponent: () => <NotFound />,
-  component: RootComponent,
-});
+      return {
+        user,
+      };
+    },
+    head: () => ({
+      scripts: [
+        {
+          src: "https://kit.fontawesome.com/73c1af5054.js",
+          crossorigin: "anonymous",
+          async: true,
+        },
+      ],
+      meta: [
+        {
+          charSet: "utf-8",
+        },
+        {
+          name: "viewport",
+          content: "width=device-width, initial-scale=1",
+        },
+        ...seo({
+          title: "Football Weekly Picks",
+          description: `A simple app to help you keep track of your weekly football picks.`,
+        }),
+      ],
+      links: [
+        { rel: "stylesheet", href: appCss },
+        {
+          rel: "apple-touch-icon",
+          sizes: "180x180",
+          href: "/apple-touch-icon.png",
+        },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "32x32",
+          href: "https://fav.farm/🏈",
+        },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "16x16",
+          href: "https://fav.farm/🏈",
+        },
+        { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
+        { rel: "icon", href: "https://fav.farm/🏈" },
+        {
+          rel: "preconnect",
+          href: "https://fonts.googleapis.com",
+        },
+        {
+          rel: "preconnect",
+          href: "https://fonts.gstatic.com",
+          crossOrigin: "anonymous",
+        },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Narnoor:wght@400;500;600;700;800&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap",
+        },
+      ],
+    }),
+    errorComponent: (props) => {
+      return (
+        <RootDocument>
+          <DefaultCatchBoundary {...props} />
+        </RootDocument>
+      );
+    },
+    notFoundComponent: () => <NotFound />,
+    component: RootComponent,
+  }
+);
 
 function RootComponent() {
   return (
@@ -133,10 +138,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <div className="pt-6 px-6">
-          <div>
-            <FontAwesomeIcon icon={faFootball} />
-            <h1>Weekly Football Picks</h1>
+        <div className="pt-6 px-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <FontAwesomeIcon size="xl" icon={faFootball} />
+            <h1 className="text-2xl">Weekly Football Picks</h1>
           </div>
           <div>
             <NavigationMenu>
@@ -154,7 +159,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           </div>
           <div>
             {user ? (
-              <div>Account Button</div>
+              <FontAwesomeIcon size="lg" icon={faUserRegular} />
             ) : (
               <Button asChild>
                 <Link to="/login">Login</Link>
@@ -191,8 +196,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             )}
           </div>
         </div> */}
-        <div className="px-6">{children}</div>
+        <div className="h-dvh pt-16 px-6">{children}</div>
         <TanStackRouterDevtools position="bottom-right" />
+        <ReactQueryDevtools buttonPosition="bottom-left" />
         <Scripts />
       </body>
     </html>

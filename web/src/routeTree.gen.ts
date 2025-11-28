@@ -14,10 +14,9 @@ import { Route as LogoutRouteImport } from './routes/logout'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthedPostsRouteImport } from './routes/_authed/posts'
 import { Route as AuthedLeaguesRouteImport } from './routes/_authed/leagues'
-import { Route as AuthedPostsIndexRouteImport } from './routes/_authed/posts.index'
-import { Route as AuthedPostsPostIdRouteImport } from './routes/_authed/posts.$postId'
+import { Route as AuthedLeaguesIndexRouteImport } from './routes/_authed/leagues.index'
+import { Route as AuthedLeaguesLeagueIdRouteImport } from './routes/_authed/leagues.$leagueId'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -43,25 +42,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthedPostsRoute = AuthedPostsRouteImport.update({
-  id: '/posts',
-  path: '/posts',
-  getParentRoute: () => AuthedRoute,
-} as any)
 const AuthedLeaguesRoute = AuthedLeaguesRouteImport.update({
   id: '/leagues',
   path: '/leagues',
   getParentRoute: () => AuthedRoute,
 } as any)
-const AuthedPostsIndexRoute = AuthedPostsIndexRouteImport.update({
+const AuthedLeaguesIndexRoute = AuthedLeaguesIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AuthedPostsRoute,
+  getParentRoute: () => AuthedLeaguesRoute,
 } as any)
-const AuthedPostsPostIdRoute = AuthedPostsPostIdRouteImport.update({
-  id: '/$postId',
-  path: '/$postId',
-  getParentRoute: () => AuthedPostsRoute,
+const AuthedLeaguesLeagueIdRoute = AuthedLeaguesLeagueIdRouteImport.update({
+  id: '/$leagueId',
+  path: '/$leagueId',
+  getParentRoute: () => AuthedLeaguesRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -69,19 +63,17 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
-  '/leagues': typeof AuthedLeaguesRoute
-  '/posts': typeof AuthedPostsRouteWithChildren
-  '/posts/$postId': typeof AuthedPostsPostIdRoute
-  '/posts/': typeof AuthedPostsIndexRoute
+  '/leagues': typeof AuthedLeaguesRouteWithChildren
+  '/leagues/$leagueId': typeof AuthedLeaguesLeagueIdRoute
+  '/leagues/': typeof AuthedLeaguesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
-  '/leagues': typeof AuthedLeaguesRoute
-  '/posts/$postId': typeof AuthedPostsPostIdRoute
-  '/posts': typeof AuthedPostsIndexRoute
+  '/leagues/$leagueId': typeof AuthedLeaguesLeagueIdRoute
+  '/leagues': typeof AuthedLeaguesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -90,10 +82,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/logout': typeof LogoutRoute
   '/signup': typeof SignupRoute
-  '/_authed/leagues': typeof AuthedLeaguesRoute
-  '/_authed/posts': typeof AuthedPostsRouteWithChildren
-  '/_authed/posts/$postId': typeof AuthedPostsPostIdRoute
-  '/_authed/posts/': typeof AuthedPostsIndexRoute
+  '/_authed/leagues': typeof AuthedLeaguesRouteWithChildren
+  '/_authed/leagues/$leagueId': typeof AuthedLeaguesLeagueIdRoute
+  '/_authed/leagues/': typeof AuthedLeaguesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -103,18 +94,10 @@ export interface FileRouteTypes {
     | '/logout'
     | '/signup'
     | '/leagues'
-    | '/posts'
-    | '/posts/$postId'
-    | '/posts/'
+    | '/leagues/$leagueId'
+    | '/leagues/'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/login'
-    | '/logout'
-    | '/signup'
-    | '/leagues'
-    | '/posts/$postId'
-    | '/posts'
+  to: '/' | '/login' | '/logout' | '/signup' | '/leagues/$leagueId' | '/leagues'
   id:
     | '__root__'
     | '/'
@@ -123,9 +106,8 @@ export interface FileRouteTypes {
     | '/logout'
     | '/signup'
     | '/_authed/leagues'
-    | '/_authed/posts'
-    | '/_authed/posts/$postId'
-    | '/_authed/posts/'
+    | '/_authed/leagues/$leagueId'
+    | '/_authed/leagues/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -173,13 +155,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authed/posts': {
-      id: '/_authed/posts'
-      path: '/posts'
-      fullPath: '/posts'
-      preLoaderRoute: typeof AuthedPostsRouteImport
-      parentRoute: typeof AuthedRoute
-    }
     '/_authed/leagues': {
       id: '/_authed/leagues'
       path: '/leagues'
@@ -187,45 +162,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedLeaguesRouteImport
       parentRoute: typeof AuthedRoute
     }
-    '/_authed/posts/': {
-      id: '/_authed/posts/'
+    '/_authed/leagues/': {
+      id: '/_authed/leagues/'
       path: '/'
-      fullPath: '/posts/'
-      preLoaderRoute: typeof AuthedPostsIndexRouteImport
-      parentRoute: typeof AuthedPostsRoute
+      fullPath: '/leagues/'
+      preLoaderRoute: typeof AuthedLeaguesIndexRouteImport
+      parentRoute: typeof AuthedLeaguesRoute
     }
-    '/_authed/posts/$postId': {
-      id: '/_authed/posts/$postId'
-      path: '/$postId'
-      fullPath: '/posts/$postId'
-      preLoaderRoute: typeof AuthedPostsPostIdRouteImport
-      parentRoute: typeof AuthedPostsRoute
+    '/_authed/leagues/$leagueId': {
+      id: '/_authed/leagues/$leagueId'
+      path: '/$leagueId'
+      fullPath: '/leagues/$leagueId'
+      preLoaderRoute: typeof AuthedLeaguesLeagueIdRouteImport
+      parentRoute: typeof AuthedLeaguesRoute
     }
   }
 }
 
-interface AuthedPostsRouteChildren {
-  AuthedPostsPostIdRoute: typeof AuthedPostsPostIdRoute
-  AuthedPostsIndexRoute: typeof AuthedPostsIndexRoute
+interface AuthedLeaguesRouteChildren {
+  AuthedLeaguesLeagueIdRoute: typeof AuthedLeaguesLeagueIdRoute
+  AuthedLeaguesIndexRoute: typeof AuthedLeaguesIndexRoute
 }
 
-const AuthedPostsRouteChildren: AuthedPostsRouteChildren = {
-  AuthedPostsPostIdRoute: AuthedPostsPostIdRoute,
-  AuthedPostsIndexRoute: AuthedPostsIndexRoute,
+const AuthedLeaguesRouteChildren: AuthedLeaguesRouteChildren = {
+  AuthedLeaguesLeagueIdRoute: AuthedLeaguesLeagueIdRoute,
+  AuthedLeaguesIndexRoute: AuthedLeaguesIndexRoute,
 }
 
-const AuthedPostsRouteWithChildren = AuthedPostsRoute._addFileChildren(
-  AuthedPostsRouteChildren,
+const AuthedLeaguesRouteWithChildren = AuthedLeaguesRoute._addFileChildren(
+  AuthedLeaguesRouteChildren,
 )
 
 interface AuthedRouteChildren {
-  AuthedLeaguesRoute: typeof AuthedLeaguesRoute
-  AuthedPostsRoute: typeof AuthedPostsRouteWithChildren
+  AuthedLeaguesRoute: typeof AuthedLeaguesRouteWithChildren
 }
 
 const AuthedRouteChildren: AuthedRouteChildren = {
-  AuthedLeaguesRoute: AuthedLeaguesRoute,
-  AuthedPostsRoute: AuthedPostsRouteWithChildren,
+  AuthedLeaguesRoute: AuthedLeaguesRouteWithChildren,
 }
 
 const AuthedRouteWithChildren =
