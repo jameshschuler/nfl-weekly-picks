@@ -123,9 +123,11 @@ function LeagueComponent() {
               <SelectContent>
                 <SelectGroup>
                   <SelectLabel>Week</SelectLabel>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
+                  {Array.from({ length: 18 }).map((_, index) => (
+                    <SelectItem key={index + 1} value={(index + 1).toString()}>
+                      {index + 1}
+                    </SelectItem>
+                  ))}
                 </SelectGroup>
               </SelectContent>
             </Select>

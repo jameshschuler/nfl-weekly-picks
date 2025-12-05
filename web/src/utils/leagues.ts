@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getSupabaseServerClient } from "./supabase";
 import camelcaseKeys from "camelcase-keys";
 import { queryOptions } from "@tanstack/react-query";
+import dayjs from "dayjs";
 
 export const fetchLeagues = createServerFn().handler(async () => {
   const supabase = getSupabaseServerClient();
@@ -128,13 +129,79 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       .from("weekly_matchups")
       .select("id, name, short_name, start_date")
       .eq("season", "2025") // TODO: take as a parameter
-      .eq("week", week);
+      .eq("week", week)
+      .order("start_date", { ascending: true });
 
     if (error) {
       throw new Error("Error fetching schedule data.");
     }
 
-    // TODO: get current nfl week
+    let isLocked = false;
+    const now = dayjs().toISOString();
+
+    const { data: season } = await supabase
+      .schema("nflweeklypicks")
+      .from("seasons")
+      .select("id")
+      .lte("start_date", now)
+      .gte("end_date", now)
+      .single();
+
+    if (!season) {
+      // TODO: season is not active, so league is locked skip over fetching
+      isLocked = true;
+    }
+
+    const { data: weeklySchedule } = await supabase
+      .schema("nflweeklypicks")
+      .from("weekly_schedules")
+      .select("id, value, start_date, end_date")
+      .lte("start_date", now)
+      .gte("end_date", now)
+      .single();
+
+    if (!weeklySchedule) {
+      isLocked = true;
+    }
+
+    const { data: firstGame } = await supabase
+      .schema("nflweeklypicks")
+      .from("weekly_matchups")
+      .select("id, start_date")
+      .eq("season", "2025")
+      .eq("week", week)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .single();
+
+    const isBeforeFirstGame = firstGame
+      ? dayjs(now).isBefore(dayjs(firstGame.start_date))
+      : false;
+
+    const isAfterStartDate = weeklySchedule
+      ? dayjs(now).isAfter(
+          dayjs(weeklySchedule.start_date).subtract(18, "hour")
+        )
+      : false;
+
+    const isCurrentWeek = weeklySchedule
+      ? Number(weeklySchedule.value) === week
+      : false;
+
+    console.log(
+      "Is after start date of the week with offset?",
+      isAfterStartDate
+    );
+    console.log("Is before first game of the week?", isBeforeFirstGame);
+    console.log("Is current week?", isCurrentWeek);
+
+    isLocked =
+      !weeklySchedule ||
+      !isCurrentWeek ||
+      !isAfterStartDate ||
+      !isBeforeFirstGame;
+
+    console.log("Is league locked for picking?", isLocked);
 
     return data;
   });
