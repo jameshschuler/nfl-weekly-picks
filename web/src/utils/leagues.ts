@@ -102,7 +102,21 @@ export const fetchLeague = createServerFn({ method: "GET" })
 
     const league = Array.isArray(data.leagues) ? data.leagues[0] : data.leagues;
 
-    return camelcaseKeys(league, { deep: true });
+    const now = dayjs().toISOString();
+    const { data: weeklySchedule } = await supabase
+      .schema("nflweeklypicks")
+      .from("weekly_schedules")
+      .select("id, value, start_date, end_date")
+      .lte("start_date", now)
+      .gte("end_date", now)
+      .single();
+
+    const currentWeek = weeklySchedule ? weeklySchedule.value : "1";
+
+    return {
+      league: camelcaseKeys(league, { deep: true }),
+      currentWeek,
+    };
   });
 
 export const fetchSchedule = createServerFn({ method: "GET" })
@@ -124,7 +138,7 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       throw redirect({ to: "/login" });
     }
 
-    const { data, error } = await supabase
+    const { data: weeklyMatchups, error } = await supabase
       .schema("nflweeklypicks")
       .from("weekly_matchups")
       .select("id, name, short_name, start_date")
@@ -203,7 +217,11 @@ export const fetchSchedule = createServerFn({ method: "GET" })
 
     console.log("Is league locked for picking?", isLocked);
 
-    return data;
+    return {
+      matchups: camelcaseKeys(weeklyMatchups, { deep: true }),
+      isLocked,
+      currentWeek: weeklySchedule?.value ?? null,
+    };
   });
 
 export const scheduleQueryOptions = (week: string) =>

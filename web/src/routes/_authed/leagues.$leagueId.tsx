@@ -2,6 +2,7 @@ import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { ErrorComponent, Link, createFileRoute } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import dayjs from "dayjs";
 import { Suspense, useState } from "react";
 import { NotFound } from "~/components/NotFound";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
@@ -15,6 +16,13 @@ import {
   CardDescription,
   CardAction,
 } from "~/components/ui/card";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemTitle,
+} from "~/components/ui/item";
 import {
   Select,
   SelectContent,
@@ -60,44 +68,38 @@ interface PicksProps {
 
 function Picks({ week }: PicksProps) {
   const { data, error } = useSuspenseQuery(scheduleQueryOptions(week));
+  const { matchups, isLocked, currentWeek } = data;
 
   return (
-    //TODO: maybe use Item component
-    <Table className="w-full">
-      {/* <TableCaption>A list of your recent invoices.</TableCaption> */}
-      <TableHeader>
-        <TableRow>
-          <TableHead>Game</TableHead>
-          {/* <TableHead>Status</TableHead>
-          <TableHead>Method</TableHead>
-          <TableHead>Amount</TableHead> */}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {data.map((schedule) => (
-          <TableRow key={schedule.id}>
-            <TableCell>{schedule.name}</TableCell>
-            {/* <TableCell>{invoice.paymentStatus}</TableCell>
-            <TableCell>{invoice.paymentMethod}</TableCell>
-            <TableCell className="text-right">{invoice.totalAmount}</TableCell> */}
-          </TableRow>
-        ))}
-      </TableBody>
-      {/* <TableFooter>
-        <TableRow>
-          <TableCell colSpan={3}>Total</TableCell>
-          <TableCell className="text-right">$2,500.00</TableCell>
-        </TableRow>
-      </TableFooter> */}
-    </Table>
+    <div className="flex flex-col gap-4 mt-4">
+      {matchups.map((schedule) => {
+        return (
+          <Item variant="outline" key={schedule.id}>
+            <ItemContent>
+              <ItemTitle>
+                {schedule.name} ({schedule.shortName})
+              </ItemTitle>
+              <ItemDescription>
+                {dayjs(schedule.startDate).format("MMMM D, YYYY @ h:mm A")}
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <Button variant="outline" size="sm">
+                Action
+              </Button>
+            </ItemActions>
+          </Item>
+        );
+      })}
+    </div>
   );
 }
 
 function LeagueComponent() {
-  const league = Route.useLoaderData();
+  const { league, currentWeek } = Route.useLoaderData();
   const { user } = Route.useRouteContext();
 
-  const [week, setWeek] = useState("1");
+  const [week, setWeek] = useState(currentWeek ?? "1");
 
   return (
     <div className="px-8 pb-8 flex flex-col gap-12">
@@ -108,7 +110,7 @@ function LeagueComponent() {
           <Button>Invite Friends</Button>
         </div>
       </div>
-      <div className="flex justify-between gap-8">
+      <div className="flex justify-between gap-12">
         <Tabs defaultValue="picks" className="flex-1 gap-4">
           <TabsList>
             <TabsTrigger value="picks">Picks</TabsTrigger>
@@ -116,21 +118,44 @@ function LeagueComponent() {
             <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
           <TabsContent value="picks">
-            <Select onValueChange={(value) => setWeek(value)} value={week}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a week" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectLabel>Week</SelectLabel>
-                  {Array.from({ length: 18 }).map((_, index) => (
-                    <SelectItem key={index + 1} value={(index + 1).toString()}>
-                      {index + 1}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-3">
+                <p>Season</p>
+                <Select value="2025">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a week" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Season</SelectLabel>
+                      <SelectItem value="2025">2025</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-3">
+                <p>Week</p>
+                <Select onValueChange={(value) => setWeek(value)} value={week}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a week" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Week</SelectLabel>
+                      {Array.from({ length: 18 }).map((_, index) => (
+                        <SelectItem
+                          key={index + 1}
+                          value={(index + 1).toString()}
+                        >
+                          {index + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <Suspense fallback={<div>Loading Picks...</div>}>
               <Picks week={week} />
             </Suspense>
