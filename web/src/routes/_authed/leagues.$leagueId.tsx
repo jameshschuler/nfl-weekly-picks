@@ -1,10 +1,8 @@
-import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { ErrorComponent, Link, createFileRoute } from "@tanstack/react-router";
+import { ErrorComponent, createFileRoute } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import dayjs from "dayjs";
 import { Suspense, useState } from "react";
 import { NotFound } from "~/components/NotFound";
+import { PicksTab } from "~/components/PicksTab";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -17,13 +15,6 @@ import {
   CardAction,
 } from "~/components/ui/card";
 import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemTitle,
-} from "~/components/ui/item";
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -32,22 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import {
-  fetchLeague,
-  fetchSchedule,
-  scheduleQueryOptions,
-} from "~/utils/leagues";
+import { fetchLeague } from "~/utils/leagues";
 
 export const Route = createFileRoute("/_authed/leagues/$leagueId")({
   loader: ({ params: { leagueId } }) => fetchLeague({ data: leagueId }),
@@ -60,39 +37,6 @@ export const Route = createFileRoute("/_authed/leagues/$leagueId")({
 
 export function LeagueErrorComponent({ error }: ErrorComponentProps) {
   return <ErrorComponent error={error} />;
-}
-
-interface PicksProps {
-  week: string;
-}
-
-function Picks({ week }: PicksProps) {
-  const { data, error } = useSuspenseQuery(scheduleQueryOptions(week));
-  const { matchups, isLocked, currentWeek } = data;
-
-  return (
-    <div className="flex flex-col gap-4 mt-4">
-      {matchups.map((schedule) => {
-        return (
-          <Item variant="outline" key={schedule.id}>
-            <ItemContent>
-              <ItemTitle>
-                {schedule.name} ({schedule.shortName})
-              </ItemTitle>
-              <ItemDescription>
-                {dayjs(schedule.startDate).format("MMMM D, YYYY @ h:mm A")}
-              </ItemDescription>
-            </ItemContent>
-            <ItemActions>
-              <Button variant="outline" size="sm">
-                Action
-              </Button>
-            </ItemActions>
-          </Item>
-        );
-      })}
-    </div>
-  );
 }
 
 function LeagueComponent() {
@@ -157,7 +101,7 @@ function LeagueComponent() {
             </div>
 
             <Suspense fallback={<div>Loading Picks...</div>}>
-              <Picks week={week} />
+              <PicksTab week={week} />
             </Suspense>
           </TabsContent>
           <TabsContent value="results">Change your password here.</TabsContent>

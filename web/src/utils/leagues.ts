@@ -1,9 +1,105 @@
 import { notFound, redirect } from "@tanstack/react-router";
 import { createServerFn } from "@tanstack/react-start";
-import { getSupabaseServerClient } from "./supabase";
+import { getServiceSupabaseClient, getSupabaseServerClient } from "./supabase";
 import camelcaseKeys from "camelcase-keys";
 import { queryOptions } from "@tanstack/react-query";
 import dayjs from "dayjs";
+
+interface Event {
+  id: string;
+  competitions: {
+    competitors: {
+      //
+      team: {
+        id: string; // external team ID
+      };
+      winner: boolean;
+      homeAway: "home" | "away";
+      record: {
+        displayValue: string;
+      };
+      score: {
+        value: number;
+      };
+    }[];
+    status: {
+      type: {
+        name: string; // STATUS_IN_PROGRESS, STATUS_FINAL
+        completed: boolean;
+      };
+    };
+  }[];
+}
+
+async function fetchAndStoreMatchupMetadata(week: number) {
+  console.log("Fetching and storing matchup metadata...");
+  const supabase = getServiceSupabaseClient();
+
+  const { data: weekMatchupMetadata, error } = await supabase
+    .schema("nflweeklypicks")
+    .from("weekly_matchup_metadatas")
+    .select("*")
+    .eq("season", "2025")
+    .eq("week", week);
+
+  if (error) {
+    console.error("Error checking existing matchup metadata:", error);
+    return;
+  }
+
+  if (weekMatchupMetadata.length > 0) {
+    // if week is active, should cache and refresh every 15 minutes? TODO: implement caching strategy
+    // TODO: if week is active, consider refreshing data
+    return weekMatchupMetadata;
+  }
+
+  try {
+    const response = await fetch(
+      `https://partners.api.espn.com/v2/sports/football/nfl/events?dates=2025&limit=1000&week=${week}`
+    );
+    const data = await response.json();
+    const events = data.events as Event[];
+
+    const eventsToInsert = events.map((event) => {
+      const comp = event.competitions[0];
+
+      const winningTeamId = comp.status.type.completed
+        ? comp.competitors.find((c) => c.winner)?.team.id
+        : undefined;
+
+      const homeTeam = comp.competitors.find((c) => c.homeAway === "home")!;
+      const awayTeam = comp.competitors.find((c) => c.homeAway === "away")!;
+
+      return {
+        season: "2025",
+        week,
+        external_event_id: event.id,
+        home_team_score: homeTeam.score.value ?? 0,
+        away_team_score: awayTeam.score.value ?? 0,
+        winning_team_id: winningTeamId,
+        home_team_record: homeTeam.record.displayValue,
+        away_team_record: awayTeam.record.displayValue,
+        event_status: comp.status.type.name,
+      };
+    });
+
+    const { data: insertedData, error: insertError } = await supabase
+      .schema("nflweeklypicks")
+      .from("weekly_matchup_metadatas")
+      .insert(eventsToInsert)
+      .select();
+
+    if (insertError) {
+      console.error("Error inserting matchup metadata:", insertError);
+      return;
+    }
+
+    return insertedData;
+  } catch (err) {
+    console.error("Error fetching/storing matchup metadata:", err);
+    return;
+  }
+}
 
 export const fetchLeagues = createServerFn().handler(async () => {
   const supabase = getSupabaseServerClient();
@@ -166,6 +262,11 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       isLocked = true;
     }
 
+    const matchupData = await fetchAndStoreMatchupMetadata(week);
+    const matchupDataMap = new Map<string, any>(
+      (matchupData ?? []).map((item) => [item.id, item])
+    );
+
     const { data: weeklySchedule } = await supabase
       .schema("nflweeklypicks")
       .from("weekly_schedules")
@@ -219,6 +320,7 @@ export const fetchSchedule = createServerFn({ method: "GET" })
 
     return {
       matchups: camelcaseKeys(weeklyMatchups, { deep: true }),
+      matchupData: camelcaseKeys(matchupDataMap, { deep: true }),
       isLocked,
       currentWeek: weeklySchedule?.value ?? null,
     };
