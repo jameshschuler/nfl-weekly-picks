@@ -8,15 +8,13 @@ interface PicksTabProps {
 
 export function PicksTab({ week }: PicksTabProps) {
   const { data, error } = useSuspenseQuery(scheduleQueryOptions(week));
-  const { matchups, matchupData, isLocked, currentWeek } = data;
-
-  console.log(matchupData);
+  const { matchups, isLocked, currentWeek } = data;
 
   return (
     <div className="flex flex-col gap-4 mt-4">
-      {matchups.map((schedule) => {
+      {matchups.map((matchup) => {
         return (
-          <Matchup key={schedule.id} isLocked={isLocked} schedule={schedule} />
+          <Matchup key={matchup.id} isLocked={isLocked} matchup={matchup} />
         );
       })}
     </div>

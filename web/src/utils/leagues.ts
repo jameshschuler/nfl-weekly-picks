@@ -5,6 +5,8 @@ import camelcaseKeys from "camelcase-keys";
 import { queryOptions } from "@tanstack/react-query";
 import dayjs from "dayjs";
 
+// TODO: error handling/logging
+
 interface Event {
   id: string;
   competitions: {
@@ -31,8 +33,7 @@ interface Event {
   }[];
 }
 
-async function fetchAndStoreMatchupMetadata(week: number) {
-  console.log("Fetching and storing matchup metadata...");
+async function fetchAndStoreMatchupMetadata(week: string) {
   const supabase = getServiceSupabaseClient();
 
   const { data: weekMatchupMetadata, error } = await supabase
@@ -76,7 +77,7 @@ async function fetchAndStoreMatchupMetadata(week: number) {
         external_event_id: event.id,
         home_team_score: homeTeam.score.value ?? 0,
         away_team_score: awayTeam.score.value ?? 0,
-        winning_team_id: winningTeamId,
+        winning_team_id: winningTeamId ? Number(winningTeamId) : null,
         home_team_record: homeTeam.record.displayValue,
         away_team_record: awayTeam.record.displayValue,
         event_status: comp.status.type.name,
@@ -127,7 +128,6 @@ export const fetchLeagues = createServerFn().handler(async () => {
     )
     .eq("user_id", user.id);
 
-  // TODO: How should errors be handled here?
   if (error) {
     throw new Error("Error fetching leagues.");
   }
@@ -154,7 +154,13 @@ export const fetchLeagues = createServerFn().handler(async () => {
 });
 
 export const fetchLeague = createServerFn({ method: "GET" })
-  .inputValidator((d: string) => d)
+  .inputValidator((d: string) => {
+    const week = parseInt(d, 10);
+    if (isNaN(week) || week < 1 || week > 18) {
+      throw new Error("Week must be a number between 1 and 18.");
+    }
+    return Number(week);
+  })
   .handler(async ({ data: leagueId }) => {
     const supabase = getSupabaseServerClient();
     const {
@@ -184,7 +190,6 @@ export const fetchLeague = createServerFn({ method: "GET" })
       .eq("league_id", leagueId)
       .single();
 
-    // TODO: How should errors be handled here?
     if (error) {
       throw new Error("Error fetching league data.");
     }
@@ -221,7 +226,7 @@ export const fetchSchedule = createServerFn({ method: "GET" })
     if (isNaN(week) || week < 1 || week > 18) {
       throw new Error("Week must be a number between 1 and 18.");
     }
-    return week;
+    return d;
   })
   .handler(async ({ data: week }) => {
     const supabase = getSupabaseServerClient();
@@ -237,7 +242,7 @@ export const fetchSchedule = createServerFn({ method: "GET" })
     const { data: weeklyMatchups, error } = await supabase
       .schema("nflweeklypicks")
       .from("weekly_matchups")
-      .select("id, name, short_name, start_date")
+      .select("id, name, short_name, start_date, external_id")
       .eq("season", "2025") // TODO: take as a parameter
       .eq("week", week)
       .order("start_date", { ascending: true });
@@ -262,10 +267,19 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       isLocked = true;
     }
 
-    const matchupData = await fetchAndStoreMatchupMetadata(week);
-    const matchupDataMap = new Map<string, any>(
-      (matchupData ?? []).map((item) => [item.id, item])
+    const matchups = await fetchAndStoreMatchupMetadata(week);
+    const matchupByExternalId = new Map(
+      (matchups ?? []).map((item) => [item.external_event_id, item])
     );
+
+    const matchupsWithMetadata = weeklyMatchups.map((matchup) => {
+      const metadata = matchupByExternalId.get(matchup.external_id);
+
+      return {
+        ...matchup,
+        metadata,
+      };
+    });
 
     const { data: weeklySchedule } = await supabase
       .schema("nflweeklypicks")
@@ -300,7 +314,7 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       : false;
 
     const isCurrentWeek = weeklySchedule
-      ? Number(weeklySchedule.value) === week
+      ? weeklySchedule.value === week
       : false;
 
     console.log(
@@ -319,12 +333,13 @@ export const fetchSchedule = createServerFn({ method: "GET" })
     console.log("Is league locked for picking?", isLocked);
 
     return {
-      matchups: camelcaseKeys(weeklyMatchups, { deep: true }),
-      matchupData: camelcaseKeys(matchupDataMap, { deep: true }),
+      matchups: camelcaseKeys(matchupsWithMetadata, { deep: true }),
       isLocked,
       currentWeek: weeklySchedule?.value ?? null,
     };
   });
+
+export type MatchData = Awaited<ReturnType<typeof fetchSchedule>>;
 
 export const scheduleQueryOptions = (week: string) =>
   queryOptions({
