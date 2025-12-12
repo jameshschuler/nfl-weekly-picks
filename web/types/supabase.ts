@@ -228,11 +228,13 @@ export type Database = {
       }
       weekly_matchup_metadatas: {
         Row: {
+          away_team_external_id: string
           away_team_record: string
           away_team_score: number
           created_at: string
           event_status: string
           external_event_id: string
+          home_team_external_id: string
           home_team_record: string
           home_team_score: number
           id: number
@@ -242,11 +244,13 @@ export type Database = {
           winning_team_id: number | null
         }
         Insert: {
+          away_team_external_id: string
           away_team_record: string
           away_team_score?: number
           created_at?: string
           event_status: string
           external_event_id: string
+          home_team_external_id: string
           home_team_record: string
           home_team_score?: number
           id?: number
@@ -256,11 +260,13 @@ export type Database = {
           winning_team_id?: number | null
         }
         Update: {
+          away_team_external_id?: string
           away_team_record?: string
           away_team_score?: number
           created_at?: string
           event_status?: string
           external_event_id?: string
+          home_team_external_id?: string
           home_team_record?: string
           home_team_score?: number
           id?: number

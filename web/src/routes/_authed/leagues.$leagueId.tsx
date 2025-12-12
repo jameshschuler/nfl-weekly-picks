@@ -2,7 +2,7 @@ import { ErrorComponent, createFileRoute } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import { Suspense, useState } from "react";
 import { NotFound } from "~/components/NotFound";
-import { PicksTab } from "~/components/PicksTab";
+import { PicksTab } from "~/components/picks/PicksTab";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 import { Button } from "~/components/ui/button";
 import {
@@ -40,10 +40,9 @@ export function LeagueErrorComponent({ error }: ErrorComponentProps) {
 }
 
 function LeagueComponent() {
+  // TODO: need to know if current week is locked or not?
   const { league, currentWeek } = Route.useLoaderData();
   const { user } = Route.useRouteContext();
-
-  const [week, setWeek] = useState(currentWeek ?? "1");
 
   return (
     <div className="px-8 pb-8 flex flex-col gap-12">
@@ -61,53 +60,9 @@ function LeagueComponent() {
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
-          <TabsContent value="picks">
-            <div className="flex gap-4">
-              <div className="flex items-center gap-3">
-                <p>Season</p>
-                <Select value="2025">
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a week" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Season</SelectLabel>
-                      <SelectItem value="2025">2025</SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center gap-3">
-                <p>Week</p>
-                <Select onValueChange={(value) => setWeek(value)} value={week}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a week" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectLabel>Week</SelectLabel>
-                      {Array.from({ length: 18 }).map((_, index) => (
-                        <SelectItem
-                          key={index + 1}
-                          value={(index + 1).toString()}
-                        >
-                          {index + 1}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <Suspense fallback={<div>Loading Picks...</div>}>
-              <PicksTab week={week} />
-            </Suspense>
-          </TabsContent>
-          <TabsContent value="results">Change your password here.</TabsContent>
-          <TabsContent value="leaderboard">
-            Change your password here.
-          </TabsContent>
+          <PicksTab currentWeek={currentWeek} />
+          <TabsContent value="results">Results</TabsContent>
+          <TabsContent value="leaderboard">Leaderboard</TabsContent>
         </Tabs>
         <div>
           <Card>

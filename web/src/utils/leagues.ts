@@ -75,8 +75,10 @@ async function fetchAndStoreMatchupMetadata(week: string) {
         season: "2025",
         week,
         external_event_id: event.id,
-        home_team_score: homeTeam.score.value ?? 0,
-        away_team_score: awayTeam.score.value ?? 0,
+        home_team_score: homeTeam.score.value,
+        away_team_score: awayTeam.score.value,
+        home_team_external_id: homeTeam.team.id,
+        away_team_external_id: awayTeam.team.id,
         winning_team_id: winningTeamId ? Number(winningTeamId) : null,
         home_team_record: homeTeam.record.displayValue,
         away_team_record: awayTeam.record.displayValue,
@@ -242,7 +244,9 @@ export const fetchSchedule = createServerFn({ method: "GET" })
     const { data: weeklyMatchups, error } = await supabase
       .schema("nflweeklypicks")
       .from("weekly_matchups")
-      .select("id, name, short_name, start_date, external_id")
+      .select(
+        "id, name, short_name, start_date, external_id, home_team_id, away_team_id"
+      )
       .eq("season", "2025") // TODO: take as a parameter
       .eq("week", week)
       .order("start_date", { ascending: true });
