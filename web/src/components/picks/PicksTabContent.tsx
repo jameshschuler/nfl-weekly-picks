@@ -1,5 +1,5 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { scheduleQueryOptions } from "~/utils/leagues";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { savePicks, scheduleQueryOptions } from "~/utils/leagues";
 import { Matchup } from "./Matchup";
 import { useState } from "react";
 import { Button } from "../ui/button";
@@ -10,10 +10,15 @@ interface PicksTabContentProps {
 
 export function PicksTabContent({ week }: PicksTabContentProps) {
   const { data, error } = useSuspenseQuery(scheduleQueryOptions(week));
+  // TODO: handle error
   const { matchups, isLocked } = data;
 
-  // Need to add matchupId and external event id to picks table
-  // TODO: handle error
+  const { mutateAsync: savePicksAsync, isPending } = useMutation({
+    mutationFn: savePicks,
+    onSuccess: () => {
+      // TODO:
+    },
+  });
 
   const [picks, setPicks] = useState<Map<number, number | null>>(new Map());
 
@@ -25,12 +30,19 @@ export function PicksTabContent({ week }: PicksTabContentProps) {
     });
   }
 
-  console.log(picks.size);
+  async function handleSavePicks() {
+    await savePicksAsync({
+      data: {
+        week: Number(week),
+        picks: Object.fromEntries(picks),
+      },
+    });
+  }
 
   return (
     <div>
       <div className="flex justify-end">
-        {picks.size > 0 && <Button>Save</Button>}
+        {picks.size > 0 && <Button onClick={handleSavePicks}>Save</Button>}
       </div>
       <div className="flex flex-col gap-4 mt-4">
         {matchups.map((matchup) => {

@@ -4,34 +4,11 @@ import { getServiceSupabaseClient, getSupabaseServerClient } from "./supabase";
 import camelcaseKeys from "camelcase-keys";
 import { queryOptions } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import { ExternalEvent } from "~/types";
+import { z } from "zod";
+import { PicksSchema, WeekSchema } from "./schemas";
 
 // TODO: error handling/logging
-
-interface Event {
-  id: string;
-  competitions: {
-    competitors: {
-      //
-      team: {
-        id: string; // external team ID
-      };
-      winner: boolean;
-      homeAway: "home" | "away";
-      record: {
-        displayValue: string;
-      };
-      score: {
-        value: number;
-      };
-    }[];
-    status: {
-      type: {
-        name: string; // STATUS_IN_PROGRESS, STATUS_FINAL
-        completed: boolean;
-      };
-    };
-  }[];
-}
 
 async function fetchAndStoreMatchupMetadata(week: string) {
   const supabase = getServiceSupabaseClient();
@@ -59,7 +36,7 @@ async function fetchAndStoreMatchupMetadata(week: string) {
       `https://partners.api.espn.com/v2/sports/football/nfl/events?dates=2025&limit=1000&week=${week}`
     );
     const data = await response.json();
-    const events = data.events as Event[];
+    const events = data.events as ExternalEvent[];
 
     const eventsToInsert = events.map((event) => {
       const comp = event.competitions[0];
@@ -222,6 +199,71 @@ export const fetchLeague = createServerFn({ method: "GET" })
     };
   });
 
+async function checkIfLeagueIsLocked(
+  week: string
+): Promise<{ isLocked: boolean; currentWeek?: string }> {
+  const supabase = getSupabaseServerClient();
+  let isLocked = false;
+  const now = dayjs().toISOString();
+
+  const { data: season } = await supabase
+    .schema("nflweeklypicks")
+    .from("seasons")
+    .select("id")
+    .lte("start_date", now)
+    .gte("end_date", now)
+    .single();
+
+  if (!season) {
+    return { isLocked: true };
+  }
+
+  const { data: weeklySchedule } = await supabase
+    .schema("nflweeklypicks")
+    .from("weekly_schedules")
+    .select("id, value, start_date, end_date")
+    .lte("start_date", now)
+    .gte("end_date", now)
+    .single();
+
+  if (!weeklySchedule) {
+    return { isLocked: true, currentWeek: "1" };
+  }
+
+  const { data: firstGame } = await supabase
+    .schema("nflweeklypicks")
+    .from("weekly_matchups")
+    .select("id, start_date")
+    .eq("season", "2025")
+    .eq("week", week)
+    .order("start_date", { ascending: true })
+    .limit(1)
+    .single();
+
+  const isBeforeFirstGame = firstGame
+    ? dayjs(now).isBefore(dayjs(firstGame.start_date))
+    : false;
+
+  const isAfterStartDate = weeklySchedule
+    ? dayjs(now).isAfter(dayjs(weeklySchedule.start_date).subtract(18, "hour"))
+    : false;
+
+  const isCurrentWeek = weeklySchedule ? weeklySchedule.value === week : false;
+
+  console.log("Is after start date of the week with offset?", isAfterStartDate);
+  console.log("Is before first game of the week?", isBeforeFirstGame);
+  console.log("Is current week?", isCurrentWeek);
+
+  isLocked =
+    !weeklySchedule ||
+    !isCurrentWeek ||
+    !isAfterStartDate ||
+    !isBeforeFirstGame;
+
+  console.log("Is league locked for picking?", isLocked);
+  return { isLocked, currentWeek: weeklySchedule.value };
+}
+
 export const fetchSchedule = createServerFn({ method: "GET" })
   .inputValidator((d: string) => {
     const week = parseInt(d, 10);
@@ -255,22 +297,7 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       throw new Error("Error fetching schedule data.");
     }
 
-    let isLocked = false;
-    const now = dayjs().toISOString();
-
-    const { data: season } = await supabase
-      .schema("nflweeklypicks")
-      .from("seasons")
-      .select("id")
-      .lte("start_date", now)
-      .gte("end_date", now)
-      .single();
-
-    if (!season) {
-      // TODO: season is not active, so league is locked skip over fetching
-      isLocked = true;
-    }
-
+    // TODO: move to separate function
     const matchups = await fetchAndStoreMatchupMetadata(week);
     const matchupByExternalId = new Map(
       (matchups ?? []).map((item) => [item.external_event_id, item])
@@ -285,62 +312,49 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       };
     });
 
-    const { data: weeklySchedule } = await supabase
-      .schema("nflweeklypicks")
-      .from("weekly_schedules")
-      .select("id, value, start_date, end_date")
-      .lte("start_date", now)
-      .gte("end_date", now)
-      .single();
-
-    if (!weeklySchedule) {
-      isLocked = true;
-    }
-
-    const { data: firstGame } = await supabase
-      .schema("nflweeklypicks")
-      .from("weekly_matchups")
-      .select("id, start_date")
-      .eq("season", "2025")
-      .eq("week", week)
-      .order("start_date", { ascending: true })
-      .limit(1)
-      .single();
-
-    const isBeforeFirstGame = firstGame
-      ? dayjs(now).isBefore(dayjs(firstGame.start_date))
-      : false;
-
-    const isAfterStartDate = weeklySchedule
-      ? dayjs(now).isAfter(
-          dayjs(weeklySchedule.start_date).subtract(18, "hour")
-        )
-      : false;
-
-    const isCurrentWeek = weeklySchedule
-      ? weeklySchedule.value === week
-      : false;
-
-    console.log(
-      "Is after start date of the week with offset?",
-      isAfterStartDate
-    );
-    console.log("Is before first game of the week?", isBeforeFirstGame);
-    console.log("Is current week?", isCurrentWeek);
-
-    isLocked =
-      !weeklySchedule ||
-      !isCurrentWeek ||
-      !isAfterStartDate ||
-      !isBeforeFirstGame;
-
-    console.log("Is league locked for picking?", isLocked);
+    const { isLocked, currentWeek } = await checkIfLeagueIsLocked(week);
 
     return {
       matchups: camelcaseKeys(matchupsWithMetadata, { deep: true }),
       isLocked,
-      currentWeek: weeklySchedule?.value ?? null,
+      currentWeek,
     };
+  });
+
+export const savePicks = createServerFn({ method: "POST" })
+  .inputValidator(
+    z.object({
+      week: WeekSchema,
+      picks: PicksSchema,
+    })
+  )
+  .handler(async ({ data }) => {
+    const supabase = getSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    // TODO: move to middleware
+    if (!user) {
+      throw redirect({ to: "/login" });
+    }
+
+    console.log("Received picks data to save:", data);
+
+    const { isLocked, currentWeek } = await checkIfLeagueIsLocked(
+      data.week.toString()
+    );
+    if (isLocked || !currentWeek) {
+      throw new Error("League is locked for picking.");
+    }
+
+    // TODO: validate all keys are valid matchup IDs for current week
+    //const {} = await supabase.schema("nflweeklypicks").from("weekly_matchups");
+
+    // TODO: validate all values are either null or valid team IDs for the matchup
+
+    // TODO: regen types
+    // TODO: save picks logic
   });
 
 export type MatchData = Awaited<ReturnType<typeof fetchSchedule>>;
