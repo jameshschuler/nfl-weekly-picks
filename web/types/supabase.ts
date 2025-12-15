@@ -68,8 +68,10 @@ export type Database = {
       picks: {
         Row: {
           created_at: string
+          external_event_id: string
           id: number
           league_id: number
+          matchup_id: number
           season: string
           team_id: number
           tie_breaker_score: number | null
@@ -79,8 +81,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          external_event_id: string
           id?: number
           league_id: number
+          matchup_id: number
           season: string
           team_id: number
           tie_breaker_score?: number | null
@@ -90,8 +94,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          external_event_id?: string
           id?: number
           league_id?: number
+          matchup_id?: number
           season?: string
           team_id?: number
           tie_breaker_score?: number | null
@@ -105,6 +111,13 @@ export type Database = {
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "picks_matchup_id_fkey"
+            columns: ["matchup_id"]
+            isOneToOne: false
+            referencedRelation: "weekly_matchups"
             referencedColumns: ["id"]
           },
           {

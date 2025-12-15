@@ -4,10 +4,13 @@ import { getServiceSupabaseClient, getSupabaseServerClient } from "./supabase";
 import camelcaseKeys from "camelcase-keys";
 import { queryOptions } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
 import { ExternalEvent } from "~/types";
 import { z } from "zod";
-import { PicksSchema, WeekSchema } from "./schemas";
+import { LeagueIdSchema, PicksSchema, WeekSchema } from "./schemas";
+import { Database } from "types/supabase";
 
+dayjs.extend(utc);
 // TODO: error handling/logging
 
 async function fetchAndStoreMatchupMetadata(week: string) {
@@ -133,13 +136,7 @@ export const fetchLeagues = createServerFn().handler(async () => {
 });
 
 export const fetchLeague = createServerFn({ method: "GET" })
-  .inputValidator((d: string) => {
-    const week = parseInt(d, 10);
-    if (isNaN(week) || week < 1 || week > 18) {
-      throw new Error("Week must be a number between 1 and 18.");
-    }
-    return Number(week);
-  })
+  .inputValidator(LeagueIdSchema)
   .handler(async ({ data: leagueId }) => {
     const supabase = getSupabaseServerClient();
     const {
@@ -151,6 +148,7 @@ export const fetchLeague = createServerFn({ method: "GET" })
       throw redirect({ to: "/login" });
     }
 
+    // TODO: move to a validation function
     const { data, error } = await supabase
       .schema("nflweeklypicks")
       .from("league_users")
@@ -297,7 +295,25 @@ export const fetchSchedule = createServerFn({ method: "GET" })
       throw new Error("Error fetching schedule data.");
     }
 
-    // TODO: move to separate function
+    const { data: existingPicks, error: picksError } = await supabase
+      .schema("nflweeklypicks")
+      .from("picks")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("week", week)
+      .eq("season", "2025");
+
+    if (picksError) {
+      throw new Error("Error fetching existing picks.");
+    }
+
+    const existingPicksMap = new Map(
+      existingPicks.map((pick) => [
+        pick.external_event_id,
+        { matchupId: pick.matchup_id, teamId: pick.team_id },
+      ])
+    );
+
     const matchups = await fetchAndStoreMatchupMetadata(week);
     const matchupByExternalId = new Map(
       (matchups ?? []).map((item) => [item.external_event_id, item])
@@ -305,10 +321,12 @@ export const fetchSchedule = createServerFn({ method: "GET" })
 
     const matchupsWithMetadata = weeklyMatchups.map((matchup) => {
       const metadata = matchupByExternalId.get(matchup.external_id);
+      const existingPick = existingPicksMap.get(matchup.external_id);
 
       return {
         ...matchup,
         metadata,
+        pick: existingPick,
       };
     });
 
@@ -321,10 +339,13 @@ export const fetchSchedule = createServerFn({ method: "GET" })
     };
   });
 
+type InsertPicks = Database["nflweeklypicks"]["Tables"]["picks"]["Insert"];
+
 export const savePicks = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
       week: WeekSchema,
+      leagueId: LeagueIdSchema,
       picks: PicksSchema,
     })
   )
@@ -339,22 +360,101 @@ export const savePicks = createServerFn({ method: "POST" })
       throw redirect({ to: "/login" });
     }
 
-    console.log("Received picks data to save:", data);
+    const { data: leagueUser, error: leagueUserError } = await supabase
+      .schema("nflweeklypicks")
+      .from("league_users")
+      .select("id")
+      .eq("league_id", data.leagueId)
+      .eq("user_id", user.id);
+
+    if (leagueUserError || !leagueUser) {
+      throw new Error("User is not part of the league.");
+    }
 
     const { isLocked, currentWeek } = await checkIfLeagueIsLocked(
       data.week.toString()
     );
-    if (isLocked || !currentWeek) {
-      throw new Error("League is locked for picking.");
+
+    // TODO:
+    // if (isLocked || !currentWeek) {
+    //   throw new Error("League is locked for picking.");
+    // }
+
+    const keys = Object.keys(data.picks);
+    const { data: matchupData, error } = await supabase
+      .schema("nflweeklypicks")
+      .from("weekly_matchups")
+      .select("id, home_team_id, away_team_id, external_id")
+      .eq("season", "2025")
+      .eq("week", data.week.toString())
+      .in(
+        "id",
+        keys.map((k) => Number(k))
+      );
+
+    if (error) {
+      throw new Error("Error fetching matchup data for picks.");
     }
 
-    // TODO: validate all keys are valid matchup IDs for current week
-    //const {} = await supabase.schema("nflweeklypicks").from("weekly_matchups");
+    const { data: existingPicks, error: existingPicksError } = await supabase
+      .schema("nflweeklypicks")
+      .from("picks")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("league_id", data.leagueId)
+      .eq("week", data.week.toString())
+      .eq("season", "2025");
 
-    // TODO: validate all values are either null or valid team IDs for the matchup
+    if (existingPicksError) {
+      throw new Error("Error fetching existing picks.");
+    }
 
-    // TODO: regen types
-    // TODO: save picks logic
+    const existingPicksKeys = new Map(
+      existingPicks.map((pick) => [pick.matchup_id, pick])
+    );
+    const picks = new Array<InsertPicks>();
+    matchupData?.forEach((matchup) => {
+      const pickedTeamId = data.picks[matchup.id];
+      if (
+        pickedTeamId !== null &&
+        pickedTeamId !== matchup.home_team_id &&
+        pickedTeamId !== matchup.away_team_id
+      ) {
+        throw new Error(
+          `Invalid team ID ${pickedTeamId} for matchup ${matchup.id}.`
+        );
+      }
+
+      let pick: InsertPicks | null = null;
+      if (existingPicksKeys.has(matchup.id)) {
+        pick = {
+          ...existingPicksKeys.get(matchup.id)!,
+          team_id: pickedTeamId,
+          updated_at: dayjs.utc().format(),
+        };
+      } else {
+        pick = {
+          league_id: data.leagueId,
+          user_id: user.id,
+          week: data.week.toString(),
+          season: "2025",
+          team_id: pickedTeamId,
+          tie_breaker_score: null,
+          matchup_id: matchup.id,
+          external_event_id: matchup.external_id,
+        };
+      }
+
+      picks.push(pick);
+    });
+
+    const { data: insertedPicks } = await supabase
+      .schema("nflweeklypicks")
+      .from("picks")
+      .upsert(picks)
+      .select();
+
+    return { success: true, data: insertedPicks };
   });
 
 export type MatchData = Awaited<ReturnType<typeof fetchSchedule>>;

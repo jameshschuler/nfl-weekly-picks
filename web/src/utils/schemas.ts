@@ -1,17 +1,28 @@
 import { z } from "zod";
 
-export const PickValueSchema = z.union([
-  z.number().int().positive(),
-  z.literal(null),
-]);
-
 export const PicksSchema = z.record(
   z.string().regex(/^\d+$/).transform(Number),
-  PickValueSchema
+  z.number().int().positive()
 );
 
 export const WeekSchema = z
   .number()
-  .int({ message: "Week must be a whole number." })
-  .min(1, { message: "Week cannot be less than 1." })
-  .max(18, { message: "Week cannot be greater than 18." });
+  .int({ error: "Week must be a whole number." })
+  .positive({ error: "Week must be a positive number." })
+  .min(1, { error: "Week cannot be less than 1." })
+  .max(18, { error: "Week cannot be greater than 18." });
+
+import { z } from "zod";
+
+export const LeagueIdSchema = z.preprocess(
+  (val) => {
+    const processed = typeof val === "string" ? parseFloat(val) : val;
+    return processed;
+  },
+  z
+    .number({
+      error: "League ID must be a valid number string.",
+    })
+    .int({ error: "League ID must be a whole number." })
+    .positive({ error: "League ID must be a positive number." })
+);

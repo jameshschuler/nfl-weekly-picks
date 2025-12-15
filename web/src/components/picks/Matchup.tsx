@@ -17,11 +17,19 @@ interface MatchupProps {
   matchup: MatchData["matchups"][number];
   isLocked: boolean;
   onPickSelected: (matchupId: number, teamId: number | null) => void;
+  selectedTeamId?: number | null;
 }
 
-export function Matchup({ matchup, isLocked, onPickSelected }: MatchupProps) {
+export function Matchup({
+  matchup,
+  isLocked,
+  onPickSelected,
+  selectedTeamId,
+}: MatchupProps) {
   const [awayTeam, homeTeam] = matchup.name.split("at").map((s) => s.trim());
-  const [pickedTeamId, setPickedTeamId] = useState<number | null>(null);
+  const [pickedTeamId, setPickedTeamId] = useState<number | null>(
+    selectedTeamId ?? null
+  );
 
   function handlePick(teamId: number | null) {
     if (pickedTeamId === teamId) {
